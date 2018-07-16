@@ -153,7 +153,7 @@ MODULE BRUSSELATOR_IO
     
         ! Define variables
         call adios2_define_variable (var_plotnum, io_obj, "plotnum", adios2_type_integer4, ierr)
-        call adios2_define_variable (var_field, io_obj, "field", adios2_type_real, 3, &
+        call adios2_define_variable (var_field, io_obj, "field", adios2_type_dp, 3, &
             sizes, starts, subsizes, .true., ierr)
         
         ! Open file
@@ -187,11 +187,14 @@ MODULE BRUSSELATOR_IO
         character*100               					                :: name_config
         integer(KIND=4)									                :: i,j,k,iol,count,ind
         character*100									                :: number_file
-        integer                                                         :: ierr
+        integer                                                         :: myrank, ierr
     
-    
+        call mpi_comm_rank (mpi_comm_world, myrank, ierr)
+
         call adios2_begin_step  (engine, ierr)
-        call adios2_put         (engine, var_plotnum, plotnum, ierr)
+        if (myrank .eq. 0) then
+            call adios2_put     (engine, var_plotnum, plotnum, ierr)
+        endif
         call adios2_put         (engine, var_field, field, ierr)
         call adios2_end_step    (engine, ierr)
     
