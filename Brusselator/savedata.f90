@@ -7,7 +7,7 @@ MODULE BRUSSELATOR_IO
     type(adios2_adios)      :: adios2_handle
     type(adios2_io)         :: io_obj
     type(adios2_engine)     :: engine
-    type(adios2_variable)   :: var_plotnum, var_field
+    type(adios2_variable)   :: var_plotnum, var_field, var_u, var_v
     logical                 :: adios2_initialized
 
     CONTAINS
@@ -155,6 +155,10 @@ MODULE BRUSSELATOR_IO
         call adios2_define_variable (var_plotnum, io_obj, "plotnum", adios2_type_integer4, ierr)
         call adios2_define_variable (var_field, io_obj, "field", adios2_type_dp, 3, &
             sizes, starts, subsizes, .true., ierr)
+        call adios2_define_variable (var_u, io_obj, "u", adios2_type_complex_dp, 3, &
+            sizes, starts, subsizes, .true., ierr)
+        call adios2_define_variable (var_v, io_obj, "v", adios2_type_complex_dp, 3, &
+            sizes, starts, subsizes, .true., ierr)
         
         ! Open file
         call adios2_open (engine, io_obj, "./data/brusselator", adios2_mode_write, &
@@ -196,6 +200,8 @@ MODULE BRUSSELATOR_IO
             call adios2_put     (engine, var_plotnum, plotnum, ierr)
         endif
         call adios2_put         (engine, var_field, field, ierr)
+        call adios2_put         (engine, var_u, u, ierr)
+        call adios2_put         (engine, var_v, v, ierr)
         call adios2_end_step    (engine, ierr)
     
     END SUBROUTINE savedata_adios2
