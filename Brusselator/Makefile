@@ -12,7 +12,7 @@ CPP=-cpp
 	FFTW_DIR=/home/kmehta/codar-spack/opt/spack/linux-debian9-x86_64/gcc-6.3.0/fftw-3.3.7-zxd3hnvljitwwvokhojk65qaqbe22dfm
 	ADIOS2_DIR=/home/kmehta/vshare/opt/adios2-06.28/installation
 	# compilation settings, optimization, precision, parallelization
-	FLAGS =  -O3 -DADIOS2
+	FLAGS = -O3 -DADIOS2
 	
 	INCLUDES = -I${FFTW_DIR}/include -I${decompdir}/include -I${ADIOS2_DIR}/include/fortran
 

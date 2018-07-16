@@ -87,7 +87,7 @@ PROGRAM main
   USE MPI
   ! Declare variables
   IMPLICIT NONE	
-  INCLUDE 'mpif.h'	
+  !INCLUDE 'mpif.h'
   INTEGER(kind=4), PARAMETER	 ::  Nx=64
   INTEGER(kind=4), PARAMETER 	 ::  Ny=64
   INTEGER(kind=4), PARAMETER 	 ::  Nz=64
