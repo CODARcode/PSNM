@@ -32,32 +32,32 @@ OBJECTS = brusselator.o initialdata.o savedata.o getgrid.o \
 
 
 Brusselator: $(OBJECTS)
-		${COMPILER} -o Brusselator  $(OPTIONS) $(FLAGS) $(CPP) $(OBJECTS) $(LIBS)
+		${COMPILER} -o Brusselator  $(FLAGS) $(FLAGS) $(CPP) $(OBJECTS) $(LIBS)
 
 brusselator.o : brusselator.f90 savedata.o
-		${COMPILER} -c $(OPTIONS) $(CPP) $(INCLUDES) brusselator.f90
+		${COMPILER} -c $(FLAGS) $(CPP) $(INCLUDES) brusselator.f90
 
 savedata.o : savedata.f90
-		${COMPILER} -c $(OPTIONS) $(CPP) $(INCLUDES) savedata.f90
+		${COMPILER} -c $(FLAGS) $(CPP) $(INCLUDES) savedata.f90
 
 initialdata.o : initialdata.f90
-		${COMPILER} -c $(OPTIONS) $(CPP) $(INCLUDES) initialdata.f90
+		${COMPILER} -c $(FLAGS) $(CPP) $(INCLUDES) initialdata.f90
 
 getgrid.o : getgrid.f90
-		${COMPILER} -c $(OPTIONS) $(CPP) $(INCLUDES) getgrid.f90
+		${COMPILER} -c $(FLAGS) $(CPP) $(INCLUDES) getgrid.f90
 
 linear.o : linear.f90
-		${COMPILER} -c $(OPTIONS) $(CPP) $(INCLUDES) linear.f90
+		${COMPILER} -c $(FLAGS) $(CPP) $(INCLUDES) linear.f90
 
 nonlinear1.o : nonlinear1.f90
-		${COMPILER} -c $(OPTIONS) $(CPP) $(INCLUDES) nonlinear1.f90
+		${COMPILER} -c $(FLAGS) $(CPP) $(INCLUDES) nonlinear1.f90
 
 nonlinear2.o : nonlinear2.f90
-		${COMPILER} -c $(OPTIONS) $(CPP) $(INCLUDES) nonlinear2.f90
+		${COMPILER} -c $(FLAGS) $(CPP) $(INCLUDES) nonlinear2.f90
 
 
 clean:
-	rm -f *.o
+	rm -f *.o *.mod
 clobber:	
 	rm -f Brusselator
 

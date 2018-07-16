@@ -84,7 +84,7 @@ PROGRAM main
   USE decomp_2d_fft
   USE decomp_2d_io
   USE BRUSSELATOR_IO
-  !USE MPI
+  USE MPI
   ! Declare variables
   IMPLICIT NONE	
   INCLUDE 'mpif.h'	

@@ -1,4 +1,5 @@
 MODULE BRUSSELATOR_IO
+    use mpi
     use decomp_2d
     use adios2
     public 
@@ -126,8 +127,9 @@ MODULE BRUSSELATOR_IO
         
         type(decomp_info), intent(in)   :: decomp
         integer, intent(out)            :: ierr
-        integer, dimension(3)           :: sizes, subsizes, starts
+        integer*8, dimension(3)         :: sizes, subsizes, starts
 
+        ierr = 0
 #ifdef ADIOS2
         ! Code for getting sizes, subsizes, and starts copied from 2decomp_fft
         ! determine subarray parameters
