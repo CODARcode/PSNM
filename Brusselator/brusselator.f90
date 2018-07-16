@@ -1,102 +1,103 @@
-	!--------------------------------------------------------------------
-	!
-	!
-	! PURPOSE
-	!
-	! This program solves Brusselator equations in 3 dimensions
-	! u_t = a + u^2v - (b+1)u + Du (u_{xx} + u_{yy} + u_{zz})
-        ! v_t = bu - u^2v + Dv (v_{xx} + v_{yy} + v_{zz})
-	!
-	! .. Parameters ..
-	!  Nx				= number of modes in x - power of 2 for FFT
-	!  Ny				= number of modes in y - power of 2 for FFT
-	!  Nz				= number of modes in z - power of 2 for FFT
-	!  Nt				= number of timesteps to take
-	!  Tmax				= maximum simulation time
-	!  plotgap			= number of timesteps between plots
-	!  pi = 3.14159265358979323846264338327950288419716939937510d0
-	!  Lx				= width of box in x direction
-	!  Ly				= width of box in y direction
-	!  Lz				= width of box in z direction
-	!  tol				=max error each timestep
-	! .. Scalars ..
-	!  pp				= order of the splitting method
-	!  i				= loop counter in x direction
-	!  j				= loop counter in y direction
-	!  k				= loop counter in z direction
-	!  n				= loop counter for timesteps direction	
-	!  allocatestatus	= error indicator during allocation
-	!  start			= variable to record start time of program
-	!  finish			= variable to record end time of program
-	!  count_rate		= variable for clock count rate
-	!  dt				= timestep
-	!  modescalereal	= Number to scale after backward FFT 
-	!  myid				= Process id
-	!  ierr				= error code
-	!  p_row			= number of rows for domain decomposition
-	!  p_col			= number of columns for domain decomposition
-	!  plotnum			= number of plot to save
-	!  stat				= error indicator when reading inputfile
-	! .. Arrays ..
-	!  uhigh 			= approximate solution u higher order
-	!  vhigh			= approximate solution v higher order
-	!  ulow 			= approximate solution u lower order
-	!  vlow				= approximate solution v lower order
-	!  uhat 			= Fourier transform of u
-	!  vhat				= Fourier transform of v
-	!  savearray			= stores the realpart to save the data
-	! .. Vectors ..
-	!  kx				= fourier frequencies in x direction squared
-	!  ky				= fourier frequencies in y direction squared
-	!  kz				= fourier frequencies in z direction squared
-	!  x				= x locations
-	!  y				= y locations
-	!  z				= z locations
-	!  time				= times at which save data
-	!  nameconfig		= array to store filename for data to be saved    		
-	!  dpcomm
-	!  intcomm
-	! .. Special Structures ..
-	!  decomp			= contains information on domain decomposition
-	!  sp				see http://www.2decomp.org/ for more information
-	!
-	! REFERENCES
-	!
-	! ACKNOWLEDGEMENTS
-	!
-	! ACCURACY
-	!		
-	! ERROR INDICATORS AND WARNINGS
-	!
-	! FURTHER COMMENTS
-	! Check that the initial iterate is consistent with the 
-	! boundary conditions for the domain specified
-	!--------------------------------------------------------------------
-	! External routines required
-	! 
-	! External libraries required
-	! 2DECOMP&FFT	 -- Domain decomposition and Fast Fourier Library
-	!			(http://www.2decomp.org/index.html)
-	! MPI library
-		
-	PROGRAM main
-	USE decomp_2d
-	USE decomp_2d_fft
-	USE decomp_2d_io
-	!USE MPI
-	! Declare variables
-	IMPLICIT NONE	
-	INCLUDE 'mpif.h'	
-	INTEGER(kind=4), PARAMETER	 ::  Nx=64
-	INTEGER(kind=4), PARAMETER 	 ::  Ny=64
-	INTEGER(kind=4), PARAMETER 	 ::  Nz=64
-	INTEGER(kind=4), PARAMETER       ::  nmax=10000000
-	REAL(kind=8), PARAMETER		 ::  Tmax=60.0
-	REAL(kind=8), PARAMETER		 ::  plotgap=0.05
-	REAL(kind=8), PARAMETER	         ::&
-		pi=3.14159265358979323846264338327950288419716939937510d0
-	REAL(kind=8), PARAMETER		 ::  Lx=1.0,Ly=1.0,Lz=1.0
-	!equation specific
+!--------------------------------------------------------------------
+!
+!
+! PURPOSE
+!
+! This program solves Brusselator equations in 3 dimensions
+! u_t = a + u^2v - (b+1)u + Du (u_{xx} + u_{yy} + u_{zz})
+! v_t = bu - u^2v + Dv (v_{xx} + v_{yy} + v_{zz})
+!
+! .. Parameters ..
+!  Nx				= number of modes in x - power of 2 for FFT
+!  Ny				= number of modes in y - power of 2 for FFT
+!  Nz				= number of modes in z - power of 2 for FFT
+!  Nt				= number of timesteps to take
+!  Tmax				= maximum simulation time
+!  plotgap			= number of timesteps between plots
+!  pi = 3.14159265358979323846264338327950288419716939937510d0
+!  Lx				= width of box in x direction
+!  Ly				= width of box in y direction
+!  Lz				= width of box in z direction
+!  tol				=max error each timestep
+! .. Scalars ..
+!  pp				= order of the splitting method
+!  i				= loop counter in x direction
+!  j				= loop counter in y direction
+!  k				= loop counter in z direction
+!  n				= loop counter for timesteps direction	
+!  allocatestatus	= error indicator during allocation
+!  start			= variable to record start time of program
+!  finish			= variable to record end time of program
+!  count_rate		= variable for clock count rate
+!  dt				= timestep
+!  modescalereal	= Number to scale after backward FFT 
+!  myid				= Process id
+!  ierr				= error code
+!  p_row			= number of rows for domain decomposition
+!  p_col			= number of columns for domain decomposition
+!  plotnum			= number of plot to save
+!  stat				= error indicator when reading inputfile
+! .. Arrays ..
+!  uhigh 			= approximate solution u higher order
+!  vhigh			= approximate solution v higher order
+!  ulow 			= approximate solution u lower order
+!  vlow				= approximate solution v lower order
+!  uhat 			= Fourier transform of u
+!  vhat				= Fourier transform of v
+!  savearray			= stores the realpart to save the data
+! .. Vectors ..
+!  kx				= fourier frequencies in x direction squared
+!  ky				= fourier frequencies in y direction squared
+!  kz				= fourier frequencies in z direction squared
+!  x				= x locations
+!  y				= y locations
+!  z				= z locations
+!  time				= times at which save data
+!  nameconfig		= array to store filename for data to be saved    		
+!  dpcomm
+!  intcomm
+! .. Special Structures ..
+!  decomp			= contains information on domain decomposition
+!  sp				see http://www.2decomp.org/ for more information
+!
+! REFERENCES
+!
+! ACKNOWLEDGEMENTS
+!
+! ACCURACY
+!		
+! ERROR INDICATORS AND WARNINGS
+!
+! FURTHER COMMENTS
+! Check that the initial iterate is consistent with the 
+! boundary conditions for the domain specified
+!--------------------------------------------------------------------
+! External routines required
+! 
+! External libraries required
+! 2DECOMP&FFT	 -- Domain decomposition and Fast Fourier Library
+!			(http://www.2decomp.org/index.html)
+! MPI library
+
+PROGRAM main
+  USE decomp_2d
+  USE decomp_2d_fft
+  USE decomp_2d_io
+  USE BRUSSELATOR_IO
+  !USE MPI
+  ! Declare variables
+  IMPLICIT NONE	
+  INCLUDE 'mpif.h'	
+  INTEGER(kind=4), PARAMETER	 ::  Nx=64
+  INTEGER(kind=4), PARAMETER 	 ::  Ny=64
+  INTEGER(kind=4), PARAMETER 	 ::  Nz=64
+  INTEGER(kind=4), PARAMETER       ::  nmax=10000000
+  REAL(kind=8), PARAMETER		 ::  Tmax=60.0
+  REAL(kind=8), PARAMETER		 ::  plotgap=0.05
+  REAL(kind=8), PARAMETER	         ::&
+    pi=3.14159265358979323846264338327950288419716939937510d0
+  REAL(kind=8), PARAMETER		 ::  Lx=1.0,Ly=1.0,Lz=1.0
+  !equation specific
 	REAL(kind=8), PARAMETER		 ::  a=2.0d0
 	REAL(kind=8), PARAMETER          ::  b=18.20d0
 	REAL(kind=8), PARAMETER		 ::  Du=0.050d0
@@ -159,6 +160,8 @@
 	CALL decomp_info_init(Nx,Ny,Nz,decomp) ! physical domain
 	! initialise FFT library
 	CALL decomp_2d_fft_init
+
+    call io_init (decomp, ierr)
 
 	ALLOCATE(Uhigh(decomp%xst(1):decomp%xen(1),&
    				   decomp%xst(2):decomp%xen(2),&
@@ -261,6 +264,8 @@
 	IF (myid.eq.0) THEN
 	 PRINT *,'Program execution complete'
 	END IF
+
+    CALL IO_FINALIZE(ierr)
 	CALL MPI_FINALIZE(ierr)			
 	CALL system_clock(finishtot,count_rate)
 	IF (myid.eq.0) THEN
