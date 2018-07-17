@@ -4,10 +4,11 @@ MODULE BRUSSELATOR_IO
     use adios2
     public 
 
+    integer*8, dimension(3) :: sizes, subsizes, starts
     type(adios2_adios)      :: adios2_handle
     type(adios2_io)         :: io_obj
     type(adios2_engine)     :: engine
-    type(adios2_variable)   :: var_plotnum, var_field, var_u, var_v
+    type(adios2_variable)   :: var_plotnum, var_u_r, var_u_i, var_v_r, var_v_i
     logical                 :: adios2_initialized
 
     CONTAINS
@@ -85,37 +86,68 @@ MODULE BRUSSELATOR_IO
         CHARACTER*100               					:: name_config
         INTEGER(kind=4)									:: i,j,k,iol,count,ind
         CHARACTER*100									:: number_file
+        integer                                         :: ierr, myrank
     
-#ifdef ADIOS2
-        call savedata_adios2(Nx,Ny,Nz,plotnum,name,field,u,v,decomp)
-#else
     
         ! create character array with full filename
         ! write out using 2DECOMP&FFT MPI-IO routines
+
+        ! Write U real
         ind=index(name,' ') -1
         name_config=name(1:ind)//'u'
         DO k=decomp%xst(3),decomp%xen(3); DO j=decomp%xst(2),decomp%xen(2); DO i=decomp%xst(1),decomp%xen(1)
         field(i,j,k)=REAL(u(i,j,k))
         END DO; END DO; END DO
+
+#ifdef ADIOS2
+        call mpi_comm_rank (mpi_comm_world, myrank, ierr)
+        call adios2_begin_step (engine, ierr)
+        if (myrank .eq. 0) call adios2_put (engine, var_plotnum, plotnum, ierr)
+        call adios2_put (engine, var_u_r, field, ierr)
+#else
         ind = index(name_config,' ') - 1
         WRITE(number_file,'(i0)') plotnum
         number_file = name_config(1:ind)//number_file
         ind = index(number_file,' ') - 1
         number_file = number_file(1:ind)//'.datbin'	
         CALL decomp_2d_write_one(1,field,number_file, decomp)
+#endif
     
+        ! Write V real
         ind=index(name,' ') -1
         name_config=name(1:ind)//'v'
         DO k=decomp%xst(3),decomp%xen(3); DO j=decomp%xst(2),decomp%xen(2); DO i=decomp%xst(1),decomp%xen(1)
         field(i,j,k)=REAL(v(i,j,k))
         END DO; END DO; END DO
+
+#ifdef ADIOS2
+        call adios2_put (engine, var_v_r, field, ierr)
+#else
         ind = index(name_config,' ') - 1
         WRITE(number_file,'(i0)') plotnum
         number_file = name_config(1:ind)//number_file
         ind = index(number_file,' ') - 1
         number_file = number_file(1:ind)//'.datbin'	
         CALL decomp_2d_write_one(1,field,number_file, decomp)
-    
+#endif
+
+        ! Write U imag and V imag - Not in the original Brusselator code
+
+#ifdef ADIOS2
+        ! Write U imag
+        DO k=decomp%xst(3),decomp%xen(3); DO j=decomp%xst(2),decomp%xen(2); DO i=decomp%xst(1),decomp%xen(1)
+        field(i,j,k)=AIMAG(u(i,j,k))
+        END DO; END DO; END DO
+
+        call adios2_put (engine, var_u_i, field, ierr)
+
+        ! Write V imag
+        DO k=decomp%xst(3),decomp%xen(3); DO j=decomp%xst(2),decomp%xen(2); DO i=decomp%xst(1),decomp%xen(1)
+        field(i,j,k)=AIMAG(v(i,j,k))
+        END DO; END DO; END DO
+
+        call adios2_put (engine, var_v_i, field, ierr)
+        call adios2_end_step (engine, ierr)
 #endif
     END SUBROUTINE savedata
     
@@ -127,10 +159,8 @@ MODULE BRUSSELATOR_IO
         
         type(decomp_info), intent(in)   :: decomp
         integer, intent(out)            :: ierr
-        integer*8, dimension(3)         :: sizes, subsizes, starts
 
         ierr = 0
-#ifdef ADIOS2
         ! Code for getting sizes, subsizes, and starts copied from 2decomp_fft
         ! determine subarray parameters
         sizes(1) = decomp%xsz(1)
@@ -144,6 +174,7 @@ MODULE BRUSSELATOR_IO
         starts(2) = decomp%xst(2)-1
         starts(3) = decomp%xst(3)-1
         
+#ifdef ADIOS2
         ! Init adios2
         call adios2_init_config (adios2_handle, "adios2_config.xml", mpi_comm_world, &
             adios2_debug_mode_off, ierr)
@@ -153,11 +184,13 @@ MODULE BRUSSELATOR_IO
     
         ! Define variables
         call adios2_define_variable (var_plotnum, io_obj, "plotnum", adios2_type_integer4, ierr)
-        call adios2_define_variable (var_field, io_obj, "field", adios2_type_dp, 3, &
+        call adios2_define_variable (var_u_r, io_obj, "u_real", adios2_type_dp, 3, &
             sizes, starts, subsizes, .true., ierr)
-        call adios2_define_variable (var_u, io_obj, "u", adios2_type_complex_dp, 3, &
+        call adios2_define_variable (var_u_i, io_obj, "u_imag", adios2_type_dp, 3, &
             sizes, starts, subsizes, .true., ierr)
-        call adios2_define_variable (var_v, io_obj, "v", adios2_type_complex_dp, 3, &
+        call adios2_define_variable (var_v_r, io_obj, "v_real", adios2_type_dp, 3, &
+            sizes, starts, subsizes, .true., ierr)
+        call adios2_define_variable (var_v_i, io_obj, "v_imag", adios2_type_dp, 3, &
             sizes, starts, subsizes, .true., ierr)
         
         ! Open file
@@ -165,47 +198,7 @@ MODULE BRUSSELATOR_IO
             mpi_comm_world, ierr)
 #endif
     end subroutine io_init
-    !----------------------------------------------------------------------------!
 
-
-    !----------------------------------------------------------------------------!
-    SUBROUTINE savedata_adios2(Nx,Ny,Nz,plotnum,name,field,u,v,decomp)
-    !----------------------------------------------------------------------------!
-        use decomp_2d
-        use decomp_2d_fft
-        implicit none					 
-        include 'mpif.h'
-        integer(kind=4), intent(in)						                :: Nx,Ny,Nz
-        integer(kind=4), intent(in)						                :: plotnum
-        type(decomp_info), intent(in)					                ::  decomp
-        real(kind=8), dimension(decomp%xst(1):decomp%xen(1),&
-                                decomp%xst(2):decomp%xen(2),&
-                                decomp%xst(3):decomp%xen(3)), &
-                      intent(inout)                                     :: field
-        complex(kind=8), dimension(decomp%xst(1):decomp%xen(1),&
-                                   decomp%xst(2):decomp%xen(2),&
-                                   decomp%xst(3):decomp%xen(3)), &
-                         intent(in)                                     :: u,v
-        
-        character*100, intent(in)	     				                :: name
-        character*100               					                :: name_config
-        integer(KIND=4)									                :: i,j,k,iol,count,ind
-        character*100									                :: number_file
-        integer                                                         :: myrank, ierr
-    
-        call mpi_comm_rank (mpi_comm_world, myrank, ierr)
-
-        call adios2_begin_step  (engine, ierr)
-        if (myrank .eq. 0) then
-            call adios2_put     (engine, var_plotnum, plotnum, ierr)
-        endif
-        call adios2_put         (engine, var_field, field, ierr)
-        call adios2_put         (engine, var_u, u, ierr)
-        call adios2_put         (engine, var_v, v, ierr)
-        call adios2_end_step    (engine, ierr)
-    
-    END SUBROUTINE savedata_adios2
-    
     
     !----------------------------------------------------------------------------!
     SUBROUTINE IO_FINALIZE(ierr)
@@ -214,7 +207,8 @@ MODULE BRUSSELATOR_IO
     
         integer, intent(out) :: ierr
     
-        call adios2_close(engine, ierr)
+        call adios2_close    (engine, ierr)
+        call adios2_finalize (adios2_handle, ierr)
     
     END SUBROUTINE IO_FINALIZE
 
