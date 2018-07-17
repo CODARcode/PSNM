@@ -6,14 +6,93 @@ MODULE BRUSSELATOR_IO
 
     integer*8, dimension(3) :: sizes, subsizes, starts
     type(adios2_adios)      :: adios2_handle
-    type(adios2_io)         :: io_obj
-    type(adios2_engine)     :: engine
+    type(adios2_io)         :: ad_io
+    type(adios2_engine)     :: ad_engine
+    type(adios2_variable)   :: var_xcoords, var_ycoords, var_zcoords
     type(adios2_variable)   :: var_plotnum, var_u_r, var_u_i, var_v_r, var_v_i
     logical                 :: adios2_initialized
 
     CONTAINS
 
+    !----------------------------------------------------------------------------!
+    SUBROUTINE io_init (decomp, nx, ny, nz, ierr)
+    !----------------------------------------------------------------------------!
+        implicit none
+
+        type(decomp_info), intent(in)   :: decomp
+        integer, intent(in)             :: nx, ny, nz
+        integer, intent(out)            :: ierr
+
+        ierr = 0
+        ! Code for getting sizes, subsizes, and starts copied from 2decomp_fft
+        ! determine subarray parameters
+        sizes(1) = decomp%xsz(1)
+        sizes(2) = decomp%ysz(2)
+        sizes(3) = decomp%zsz(3)
+
+        subsizes(1) = decomp%xsz(1)
+        subsizes(2) = decomp%xsz(2)
+        subsizes(3) = decomp%xsz(3)
+        starts(1) = decomp%xst(1)-1  ! 0-based index
+        starts(2) = decomp%xst(2)-1
+        starts(3) = decomp%xst(3)-1
+
+#ifdef ADIOS2
+        ! Init adios2
+        call adios2_init_config (adios2_handle, "adios2_config.xml", mpi_comm_world, &
+            adios2_debug_mode_off, ierr)
+
+        ! Init IO object
+        call adios2_declare_io (ad_io, adios2_handle, "savedata", ierr)
+
+        ! Define variables
+
+        ! Coordinates x, y, z
+        call adios2_define_variable (var_xcoords, ad_io, "x_coord", adios2_type_dp, 1, &
+            1_8 * (/ nx /), 1_8 * (/ 0 /), 1_8 * (/ nx /), .true., ierr)
+        call adios2_define_variable (var_ycoords, ad_io, "y_coord", adios2_type_dp, 1, &
+            1_8 * (/ ny /), 1_8 * (/ 0 /), 1_8 * (/ ny /), .true., ierr)
+        call adios2_define_variable (var_zcoords, ad_io, "z_coord", adios2_type_dp, 1, &
+            1_8 * (/ nz /), 1_8 * (/ 0 /), 1_8 * (/ nz /), .true., ierr)
+
+        ! Per-timestep data - plotnum, u, v
+        call adios2_define_variable (var_plotnum, ad_io, "plotnum", adios2_type_integer4, ierr)
+        call adios2_define_variable (var_u_r, ad_io, "u_real", adios2_type_dp, 3, &
+            sizes, starts, subsizes, .true., ierr)
+        call adios2_define_variable (var_u_i, ad_io, "u_imag", adios2_type_dp, 3, &
+            sizes, starts, subsizes, .true., ierr)
+        call adios2_define_variable (var_v_r, ad_io, "v_real", adios2_type_dp, 3, &
+            sizes, starts, subsizes, .true., ierr)
+        call adios2_define_variable (var_v_i, ad_io, "v_imag", adios2_type_dp, 3, &
+            sizes, starts, subsizes, .true., ierr)
+
+        ! Open file
+        call adios2_open (ad_engine, ad_io, "./data/brusselator", adios2_mode_write, &
+            mpi_comm_world, ierr)
+#endif
+    end subroutine io_init
+
+
+    !----------------------------------------------------------------------------!
+    SUBROUTINE write_coordinates (xcoords, ycoords, zcoords)
+    !----------------------------------------------------------------------------!
+        ! This routine is called once, by the root process.
+        implicit none
+
+        real(kind=8), intent(in)    :: xcoords(:), ycoords(:), zcoords(:)
+        integer                     :: ierr
+
+        call adios2_put (ad_engine, var_xcoords, xcoords, adios2_mode_sync, ierr)
+        call adios2_put (ad_engine, var_ycoords, ycoords, adios2_mode_sync, ierr)
+        call adios2_put (ad_engine, var_zcoords, zcoords, adios2_mode_sync, ierr)
+
+    END SUBROUTINE write_coordinates
+    !----------------------------------------------------------------------------!
+
+
+    !----------------------------------------------------------------------------!
     SUBROUTINE savedata(Nx,Ny,Nz,plotnum,name,field,u,v,decomp)
+    !----------------------------------------------------------------------------!
         !--------------------------------------------------------------------
         !
         !
@@ -101,9 +180,9 @@ MODULE BRUSSELATOR_IO
 
 #ifdef ADIOS2
         call mpi_comm_rank (mpi_comm_world, myrank, ierr)
-        call adios2_begin_step (engine, ierr)
-        if (myrank .eq. 0) call adios2_put (engine, var_plotnum, plotnum, ierr)
-        call adios2_put (engine, var_u_r, field, ierr)
+        call adios2_begin_step (ad_engine, ierr)
+        if (myrank .eq. 0) call adios2_put (ad_engine, var_plotnum, plotnum, adios2_mode_sync, ierr)
+        call adios2_put (ad_engine, var_u_r, field, adios2_mode_sync, ierr)
 #else
         ind = index(name_config,' ') - 1
         WRITE(number_file,'(i0)') plotnum
@@ -121,7 +200,7 @@ MODULE BRUSSELATOR_IO
         END DO; END DO; END DO
 
 #ifdef ADIOS2
-        call adios2_put (engine, var_v_r, field, ierr)
+        call adios2_put (ad_engine, var_v_r, field, adios2_mode_sync, ierr)
 #else
         ind = index(name_config,' ') - 1
         WRITE(number_file,'(i0)') plotnum
@@ -139,66 +218,18 @@ MODULE BRUSSELATOR_IO
         field(i,j,k)=AIMAG(u(i,j,k))
         END DO; END DO; END DO
 
-        call adios2_put (engine, var_u_i, field, ierr)
+        call adios2_put (ad_engine, var_u_i, field, adios2_mode_sync, ierr)
 
         ! Write V imag
         DO k=decomp%xst(3),decomp%xen(3); DO j=decomp%xst(2),decomp%xen(2); DO i=decomp%xst(1),decomp%xen(1)
         field(i,j,k)=AIMAG(v(i,j,k))
         END DO; END DO; END DO
 
-        call adios2_put (engine, var_v_i, field, ierr)
-        call adios2_end_step (engine, ierr)
+        call adios2_put (ad_engine, var_v_i, field, adios2_mode_sync, ierr)
+        call adios2_end_step (ad_engine, ierr)
 #endif
     END SUBROUTINE savedata
     
-    
-    !----------------------------------------------------------------------------!
-    SUBROUTINE io_init (decomp, ierr)
-    !----------------------------------------------------------------------------!
-        implicit none
-        
-        type(decomp_info), intent(in)   :: decomp
-        integer, intent(out)            :: ierr
-
-        ierr = 0
-        ! Code for getting sizes, subsizes, and starts copied from 2decomp_fft
-        ! determine subarray parameters
-        sizes(1) = decomp%xsz(1)
-        sizes(2) = decomp%ysz(2)
-        sizes(3) = decomp%zsz(3)
-        
-        subsizes(1) = decomp%xsz(1)
-        subsizes(2) = decomp%xsz(2)
-        subsizes(3) = decomp%xsz(3)
-        starts(1) = decomp%xst(1)-1  ! 0-based index
-        starts(2) = decomp%xst(2)-1
-        starts(3) = decomp%xst(3)-1
-        
-#ifdef ADIOS2
-        ! Init adios2
-        call adios2_init_config (adios2_handle, "adios2_config.xml", mpi_comm_world, &
-            adios2_debug_mode_off, ierr)
-    
-        ! Init IO object
-        call adios2_declare_io (io_obj, adios2_handle, "savedata", ierr)
-    
-        ! Define variables
-        call adios2_define_variable (var_plotnum, io_obj, "plotnum", adios2_type_integer4, ierr)
-        call adios2_define_variable (var_u_r, io_obj, "u_real", adios2_type_dp, 3, &
-            sizes, starts, subsizes, .true., ierr)
-        call adios2_define_variable (var_u_i, io_obj, "u_imag", adios2_type_dp, 3, &
-            sizes, starts, subsizes, .true., ierr)
-        call adios2_define_variable (var_v_r, io_obj, "v_real", adios2_type_dp, 3, &
-            sizes, starts, subsizes, .true., ierr)
-        call adios2_define_variable (var_v_i, io_obj, "v_imag", adios2_type_dp, 3, &
-            sizes, starts, subsizes, .true., ierr)
-        
-        ! Open file
-        call adios2_open (engine, io_obj, "./data/brusselator", adios2_mode_write, &
-            mpi_comm_world, ierr)
-#endif
-    end subroutine io_init
-
     
     !----------------------------------------------------------------------------!
     SUBROUTINE IO_FINALIZE(ierr)
@@ -207,7 +238,7 @@ MODULE BRUSSELATOR_IO
     
         integer, intent(out) :: ierr
     
-        call adios2_close    (engine, ierr)
+        call adios2_close    (ad_engine, ierr)
         call adios2_finalize (adios2_handle, ierr)
     
     END SUBROUTINE IO_FINALIZE

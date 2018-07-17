@@ -161,7 +161,7 @@ PROGRAM main
 	! initialise FFT library
 	CALL decomp_2d_fft_init
 
-    call io_init (decomp, ierr)
+    call io_init (decomp, nx, ny, nz, ierr)
 
 	ALLOCATE(Uhigh(decomp%xst(1):decomp%xen(1),&
    				   decomp%xst(2):decomp%xen(2),&

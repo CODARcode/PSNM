@@ -43,7 +43,7 @@ savedata.o : savedata.f90
 initialdata.o : initialdata.f90
 		${COMPILER} -c $(FLAGS) $(CPP) $(INCLUDES) initialdata.f90
 
-getgrid.o : getgrid.f90
+getgrid.o : savedata.o  getgrid.f90
 		${COMPILER} -c $(FLAGS) $(CPP) $(INCLUDES) getgrid.f90
 
 linear.o : linear.f90
