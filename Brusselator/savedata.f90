@@ -237,9 +237,11 @@ MODULE BRUSSELATOR_IO
         implicit none
     
         integer, intent(out) :: ierr
-    
+
+#ifdef ADIOS2
         call adios2_close    (ad_engine, ierr)
         call adios2_finalize (adios2_handle, ierr)
+#endif
     
     END SUBROUTINE IO_FINALIZE
 
