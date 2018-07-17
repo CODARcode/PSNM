@@ -40,10 +40,10 @@ MODULE BRUSSELATOR_IO
 #ifdef ADIOS2
         ! Init adios2
         call adios2_init_config (adios2_handle, "adios2_config.xml", mpi_comm_world, &
-            adios2_debug_mode_off, ierr)
+            adios2_debug_mode_on, ierr)
 
         ! Init IO object
-        call adios2_declare_io (ad_io, adios2_handle, "savedata", ierr)
+        call adios2_declare_io (ad_io, adios2_handle, "writer", ierr)
 
         ! Define variables
 
