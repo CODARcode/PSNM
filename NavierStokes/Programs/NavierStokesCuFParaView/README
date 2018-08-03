@@ -1,5 +1,0 @@
-Tested on Forge and yes.ncsa summer of 2012.
-
-pipeline.py will output .pngs.
-
-Requires PGI for CUDA Fortran support.
